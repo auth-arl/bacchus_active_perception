@@ -1,0 +1,15 @@
+
+<launch>
+    <arg name="node_name"
+         default="active_perception_node" />
+
+    <node pkg="active_perception"
+          type="active_perception_node"
+          name="$(arg node_name)"
+          output="screen">
+
+        <rosparam command="load"
+                  file="$(find ppc)/config/config.yml" />
+
+    </node>
+</launch>
