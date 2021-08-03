@@ -9,7 +9,8 @@
           output="screen">
 
         <rosparam command="load"
-                  file="$(find ppc)/config/config.yml" />
+                  file="$(find active_perception)/config/config.yml" />
 
     </node>
+     <rosparam command="load" param="autharl_robot_model" file="$(find autharl_description)/yaml/bacchus.yml" />
 </launch>

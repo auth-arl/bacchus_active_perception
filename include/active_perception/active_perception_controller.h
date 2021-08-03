@@ -5,6 +5,8 @@
 #include <math.h>
 #include <memory>
 #include <autharl_core/robot/controller.h>
+#include <std_msgs/Int32MultiArray.h>
+
 
 
 namespace arl
@@ -20,8 +22,10 @@ public:
   void update();
   void command();
 private:
+  void stemIdentCallback(const std_msgs::Int32MultiArray::ConstPtr feedback);
   ros::NodeHandle nh;
   double k;
+  ros::Subscriber camera_subscriber;
 };
 }  // namespace controller
 }  // namespace arl
