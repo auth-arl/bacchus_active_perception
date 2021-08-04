@@ -3,12 +3,17 @@ project(active_perception)
 
 add_compile_options(-std=c++11)
 
+
+
 find_package(catkin REQUIRED
   roscpp
   autharl_core
   bacchus_robot
   std_msgs
+  cv_bridge
 )
+
+find_package(OpenCV REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include ${catkin_INCLUDE_DIRS}
@@ -16,7 +21,9 @@ catkin_package(
 
 include_directories(INCLUDE_DIRS
   include
-${catkin_INCLUDE_DIRS})
+${catkin_INCLUDE_DIRS}
+${OpenCV_INCLUDE_DIRS}
+)
 
 add_library(${PROJECT_NAME}
   src/active_perception_controller.cpp
@@ -26,6 +33,7 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
   bacchus-robot
   armadillo
 )
@@ -36,6 +44,7 @@ add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
   bacchus-robot
   armadillo
 )

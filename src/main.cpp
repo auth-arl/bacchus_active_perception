@@ -16,10 +16,10 @@ int main ( int argc, char** argv )
 
   ros::init(argc, argv, "active_perception_node");
   // Create the robot after you have launch the URDF on the parameter server
-  std::shared_ptr<arl::robot::Model> model = std::make_shared<arl::robot::ROSModel>("/robot_description");
+  std::shared_ptr<arl::robot::Model> model = std::make_shared<arl::robot::ROSModel>("/robot/robot_description");
 
   // Create a simulated robot, use can use a real robot also
-  std::shared_ptr<arl::robot::Robot> robot = std::make_shared<arl::robot::RobotSim>(model, 1);
+  std::shared_ptr<arl::robot::Robot> robot = std::make_shared<arl::robot::RobotSim>(model, 1e-3);
   // auto robot = std::make_shared<arl::ur5e::Robot>(model);
   //auto robot = std::make_shared<arl::bac::Robot>(model, false, "bacchus_test");
   // Create a visualizater for see the result in rviz
