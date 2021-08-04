@@ -10,6 +10,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <cv_bridge/cv_bridge.h>
+#include <active_perception/detector.h>
 
 
 
@@ -50,8 +51,25 @@ private:
   int cyclic_index_depth;
   bool valid_ident;
 
-  Eigen::Vector3d p_target;
+  Eigen::Vector3d p_Target_world;
+  Eigen::Vector3d p_Target_vision;
   int r_region;
+
+  Eigen::Vector3d p_camera;
+  Eigen::Matrix3d R_camera;
+
+  Eigen::MatrixXf stem_pointCloud;
+  int stem_num_points;
+  Eigen::MatrixXf obs_pointCloud;
+  int obs_num_points;
+
+  Eigen::MatrixXd J_ee;
+
+  bool vision_target;
+
+  Eigen::Vector3d v_filter;
+  double k_filter, m_filter, d_filter, Tc;
+
 };
 }  // namespace controller
 }  // namespace arl

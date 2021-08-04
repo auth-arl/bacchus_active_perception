@@ -1,3 +1,8 @@
 # variables
 k: 1.0
+buffer_size: 3
+
+k_filter: 5.0
+m_filter: 40.0
+d_filter: 100.0
 
