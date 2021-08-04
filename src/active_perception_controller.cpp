@@ -9,6 +9,23 @@ namespace controller
 {
 
 
+int ActivePerceptionController::findClosestStamp(double current_stamp,std::vector<double> stamp_list)
+{
+  double min_dur = 10000000000;
+  int closest_index = -1;
+  for(int i = 0; i<stamp_list.size; i++){
+    double dur = current_stamp - stamp_list[i] ;
+    if(dur>=0){
+      if(dur < min_dur){
+        min_dur = dur;
+        closest_index = i;
+      }
+    }
+  }
+  return closest_index;
+
+}
+
 void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArray::ConstPtr feedback)
 {
   
@@ -27,24 +44,19 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
   color[1] = 0;
   color[2] = 255;
 
-  double min_dur = 10000000000;
-    int closest_image_index = -1;
-    for(int i = 0; i<buffer_size; i++){
-      double dur = current_stamp - image_stamps[i] ;
-      if(dur>=0){
-        if(dur < min_dur){
-          min_dur = dur;
-          closest_image_index = i;
-        }
-      }
-    }
   
 
-    std::cout << "Min dur: " << min_dur << std::endl;
-    std::cout << "closest_image_index:  " << closest_image_index << std::endl;
+  int closest_rgb_index = findClosestStamp(current_stamp, image_stamps);
+  int closest_depth_index = findClosestStamp(current_stamp, depth_stamps);
+  
+  
+
+  
+  std::cout << "closest_rgb_index:  " << closest_rgb_index << std::endl;
+  std::cout << "closest_depth_index:  " << closest_depth_index << std::endl;
    
 
-  if(num_stems>=1 && closest_image_index>=0){
+  if(num_stems>=1 && closest_depth_index>=0){
 
     stem_mask_npoints = 0;
 
@@ -64,7 +76,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 
           }
 
-          image_buffer[closest_image_index].at<cv::Vec3b>(cv::Point(592 + stem_mask(i,1), 109 +  stem_mask(i,0))) = color;
+          image_buffer[closest_rgb_index].at<cv::Vec3b>(cv::Point(592 + stem_mask(i,1), 109 +  stem_mask(i,0))) = color;
 
         }
 
@@ -84,9 +96,9 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
     }
 
     std::cout << "stem_mask_npoints: " << stem_mask_npoints << std::endl;
-    std::cout << "closest image timestamp:  " << image_stamps[closest_image_index] << std::endl;
+    std::cout << "closest rgb timestamp:  " << image_stamps[closest_rgb_index] << std::endl;
     cv::Mat temp_image;
-    cv::resize(image_buffer[closest_image_index], temp_image, cv::Size(image_buffer[closest_image_index].cols/2, image_buffer[closest_image_index].rows/2));
+    cv::resize(image_buffer[closest_image_index], temp_image, cv::Size(image_buffer[closest_rgb_index].cols/2, image_buffer[closest_image_index].rows/2));
     cv::imshow("view", temp_image);
     cv::waitKey(1);
     
@@ -101,17 +113,38 @@ void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr 
 {
   
  
-  std::cout<<":: RGB LEFT MESSAGE :: "  << std::endl;
+  //std::cout<<":: RGB LEFT MESSAGE :: "  << std::endl;
   std::string time_stamp_temp = std::to_string(rgb_feedback->header.stamp.toNSec());
   time_stamp_temp = time_stamp_temp.substr(7, 3) + "." + time_stamp_temp.substr(10, 3) ;
  
 
-  cyclic_index = cyclic_index + 1;
-  cyclic_index = cyclic_index % buffer_size;
+  cyclic_index_rgb = cyclic_index_rgb + 1;
+  cyclic_index_rgb = cyclic_index_rgb % buffer_size;
 
-  image_buffer[cyclic_index] = cv_bridge::toCvShare(rgb_feedback, "bgr8")->image ;
-  image_stamps[cyclic_index] = std::stod(time_stamp_temp);
-  std::cout<<"Stamp: " <<  image_stamps[cyclic_index]<< std::endl;
+  image_buffer[cyclic_index_rgb] = cv_bridge::toCvShare(rgb_feedback, "bgr8")->image ;
+  image_stamps[cyclic_index_rgb] = std::stod(time_stamp_temp);
+  //std::cout<<"Stamp: " <<  image_stamps[cyclic_index_rgb]<< std::endl;
+
+
+
+}
+
+
+void ActivePerceptionController::depthCallback(const sensor_msgs::Image::ConstPtr depth_feedback)
+{
+  
+ 
+  std::cout<<":: DEPTH MESSAGE :: "  << std::endl;
+  std::string time_stamp_temp = std::to_string(depth_feedback->header.stamp.toNSec());
+  time_stamp_temp = time_stamp_temp.substr(7, 3) + "." + time_stamp_temp.substr(10, 3) ;
+ 
+
+  cyclic_index_depth = cyclic_index_depth + 1;
+  cyclic_index_depth = cyclic_index_depth % buffer_size;
+
+  depth_buffer[cyclic_index_depth] = cv_bridge::toCvShare(depth_feedback, "32FC1")->image ;
+  depth_stamps[cyclic_index_depth] = std::stod(time_stamp_temp);
+  std::cout<<"Stamp: " <<  depth_stamps[cyclic_index_depth]<< std::endl;
 
 
 
@@ -128,13 +161,26 @@ ActivePerceptionController::ActivePerceptionController(const std::shared_ptr<arl
 
 
   stem_mask.resize(25000,2);
-  cyclic_index = -1;
+  cyclic_index_rgb = -1;
+  cyclic_index_depth = -1;
   buffer_size = 3;
 
   valid_ident = false;
 
   image_buffer.resize(buffer_size);
   image_stamps.resize(buffer_size);
+
+
+  // get camera pose
+  Eigen::Affine3d tool_pose= robot->getTaskPose();
+
+  // initialization of the center of ROI
+  p_Target = tool_pose.translation() + 0.4*tool_pose.rotation().column(2);
+
+  // set the radius of ROI
+  r_region = 0.3;
+
+  
 
   cv::namedWindow("view", cv::WINDOW_AUTOSIZE);
   //cv::startWindowThread();

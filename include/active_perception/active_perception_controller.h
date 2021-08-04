@@ -28,6 +28,8 @@ public:
 private:
   void stemIdentCallback(const std_msgs::Int32MultiArray::ConstPtr feedback);
   void rgbCallback(const sensor_msgs::Image::ConstPtr rgb_feedback);
+  void depthCallback(const sensor_msgs::Image::ConstPtr depth_feedback);
+  int findClosestStamp(double current_stamp, std::vector<double> stamp_list);
   ros::NodeHandle nh;
   double k;
   ros::Subscriber stem_subscriber;
@@ -38,10 +40,18 @@ private:
 
   std::vector<cv::Mat> image_buffer;
   std::vector<double> image_stamps;
+
+  std::vector<cv::Mat> depth_buffer;
+  std::vector<double> depth_stamps;
+
   // std::map< int, std::string,> buffer_map;
   int buffer_size;
-  int cyclic_index;
+  int cyclic_index_rgb;
+  int cyclic_index_depth;
   bool valid_ident;
+
+  Eigen::Vector3d p_target;
+  int r_region;
 };
 }  // namespace controller
 }  // namespace arl
