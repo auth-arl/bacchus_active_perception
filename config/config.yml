@@ -1,8 +1,13 @@
 # variables
 k: 1.0
-buffer_size: 3
+buffer_size: 5
 
 k_filter: 5.0
 m_filter: 40.0
 d_filter: 100.0
+
+
+kinematic_chain: 4
+
+show_image: true
 

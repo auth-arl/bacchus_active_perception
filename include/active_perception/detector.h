@@ -37,9 +37,9 @@ public:
    * 
    * @returns The 3-D point with respect to the camera's frame
    */
-  Eigen::Vector3f backProject(const Eigen::Vector2f& point, float depth_value) const;
+  Eigen::Vector3d backProject(const Eigen::Vector2d& point, float depth_value) const;
   
-  Eigen::Vector3f project(const Eigen::Vector3f& point_3d) const;
+  Eigen::Vector3d project(const Eigen::Vector3d& point_3d) const;
 
   /**
    * @brief Returns camera matrix.
@@ -55,7 +55,7 @@ public:
    *  \end{bmatrix}
    * \f]
    */
-  Eigen::Matrix3f matrix() const;
+  Eigen::Matrix3d matrix() const;
 
   /**
    * @brief Focal length in x-axis (millimeters)

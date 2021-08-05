@@ -1,5 +1,5 @@
 #include <active_perception/active_perception_controller.h>
-
+#include <autharl_core/math/orientation.h>
 
 namespace arl
 {
@@ -7,7 +7,7 @@ namespace controller
 {
 
 // this function finds the closest (in time) stamp from a list of time stamps
-int ActivePerceptionController::findClosestStamp(double current_stamp,std::vector<double> stamp_list)
+int ActivePerceptionController::findClosestStamp(double current_stamp,std::vector<double> stamp_list, bool search_past)
 {
   // a big value
   double min_dur = 10000000000;
@@ -16,10 +16,14 @@ int ActivePerceptionController::findClosestStamp(double current_stamp,std::vecto
   int closest_index = -1;
 
   // for all the time stamps in the list
-  for(int i = 0; i<stamp_list.size; i++){
+  for(int i = 0; i<stamp_list.size(); i++){
 
     // this is the duration from current time
     double dur = current_stamp - stamp_list[i] ;
+
+    if(!search_past){
+      dur = fabs(dur);
+    }
 
     // if this time stamp is a past timestamp
     if(dur>=0){
@@ -35,6 +39,8 @@ int ActivePerceptionController::findClosestStamp(double current_stamp,std::vecto
       }
     }
   }
+
+  // std::cout<<"min_dur= "<<min_dur <<std::endl;
 
   // return
   return closest_index;
@@ -53,7 +59,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
   PinholeCamera phC(894.187, 894.187, 642.957, 361.011, 1280, 720);
  
    
-  std::cout<<"-----------------===== STEM MESSAGE ======---------------------- "  << std::endl;
+   std::cout<<"-----------------===== STEM MESSAGE ======---------------------- "  << std::endl;
 
   // Find the timestamp of the corresponding image 
   std::string label = feedback->layout.dim[0].label;
@@ -61,23 +67,23 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
   label = label.substr(13, 3) + "." + label.substr(16, 3) ;
   // convert it to DOUBLE
   double current_stamp = std::stod(label);
-  std::cout<<"Label: " << current_stamp << std::endl;
-  std::cout<<"Stems identified: " << num_stems << std::endl;
+  // std::cout<<"Label: " << current_stamp << std::endl;
+  // std::cout<<"Stems identified: " << num_stems << std::endl;
 
   // this is the color for painting the ste in the RGB result
   cv::Vec3b stem_paint_color;
-  color[0] = 0;   // B
-  color[1] = 0;   // G
-  color[2] = 255; // R
+  stem_paint_color[0] = 0;   // B
+  stem_paint_color[1] = 0;   // G
+  stem_paint_color[2] = 255; // R
 
   
   // finds the closest timestamo from the current one, both in RGB and Depth
-  int closest_rgb_index = findClosestStamp(current_stamp, image_stamps);
-  int closest_depth_index = findClosestStamp(current_stamp, depth_stamps);
+  int closest_rgb_index = findClosestStamp(current_stamp, image_stamps, true);
+  int closest_depth_index = findClosestStamp(current_stamp, depth_stamps, false);
   
   // printouts
-  std::cout << "closest_rgb_index:  " << closest_rgb_index << std::endl;
-  std::cout << "closest_depth_index:  " << closest_depth_index << std::endl;
+  // std::cout << "closest_rgb_index:  " << closest_rgb_index << std::endl;
+  // std::cout << "closest_depth_index:  " << closest_depth_index << std::endl;
    
   // if there are stems identified and the closest DEPTH index is not -1
   if(num_stems>=1 && closest_depth_index>=0){
@@ -109,17 +115,18 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
           }
 
           // find the point's position with respect to the camera
-          Eigen::Vector2f p2d;
+          Eigen::Vector2d p2d;
           int elem1 = 592 + stem_mask(i,1); // we add the offset of CERTH
           int elem2 =  109 +  stem_mask(i,0); // we add the offset of CERTH
           p2d << elem1, elem2;
           // back project
-          Eigen::Vector3f point_temp = phC.backProject( p2d , depth_buffer[closest_depth_index].at( elem1, elem2 ) );
+          Eigen::Vector3d point_temp = phC.backProject( p2d , depth_buffer[closest_depth_index].at<double>(cv::Point(elem1, elem2)));
+          // std::cout<< depth_buffer[closest_depth_index].at<double>( elem1, elem2 ) <<std::endl;
           // register the point in the stem point cloud
-          stem_pointCloud.column(i) = point_temp;
+          stem_pointCloud.col(i) = point_temp;
 
           //change the color of the point in the RGB image
-          image_buffer[closest_rgb_index].at<cv::Vec3b>(cv::Point(elem1, elem2)) = color;
+          image_buffer[closest_rgb_index].at<cv::Vec3b>(cv::Point(elem1, elem2)) = stem_paint_color;
 
         }
     }
@@ -141,18 +148,40 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
       stem_num_points = stem_mask_npoints;
 
       // compute the mean of all the stem points
-      p_Target_vision = stem_pointCloud.rows(0,stem_num_points-1).columnwise().mean();
+      // Eigen::MatrixXd temp_mat = stem_pointCloud.leftCols(stem_num_points);
+      p_Target_vision = stem_pointCloud.leftCols(stem_num_points).rowwise().mean();
     }
 
     // printouts
-    std::cout << "stem_mask_npoints: " << stem_mask_npoints << std::endl;
-    std::cout << "closest rgb timestamp:  " << image_stamps[closest_rgb_index] << std::endl;
+    // std::cout << "stem_mask_npoints: " << stem_mask_npoints << std::endl;
+    // std::cout << "identification  timestamp:  " << current_stamp << std::endl;
+    
+    // std::cout << "rgb timestamps:  ";
+    // for(int ll = 0; ll<buffer_size; ll++)  std::cout << image_stamps[ll] << " ";
+    // std::cout << std::endl;
+    //  std::cout << "closest rgb timestamp:  " << image_stamps[closest_rgb_index] << std::endl;
+     
+    //   std::cout << "depth timestamps:  ";
+    // for(int ll = 0; ll<buffer_size; ll++) std::cout  << depth_stamps[ll] << " ";
+    // std::cout << std::endl;
+    //  std::cout << "closest depth timestamp:  " << depth_stamps[closest_depth_index] << std::endl;
+    // std::cout << "stem_num_points: " << stem_num_points<< std::endl;
+    // std::cout << "stem_pointCloud: " << stem_pointCloud.leftCols(stem_num_points) << std::endl;
 
     // CV image display
     cv::Mat temp_image;
-    cv::resize(image_buffer[closest_image_index], temp_image, cv::Size(image_buffer[closest_rgb_index].cols/2, image_buffer[closest_image_index].rows/2));
-    cv::imshow("view", temp_image);
-    cv::waitKey(1);
+
+    // uncomment to plot RGB IMAGE
+    // cv::resize(image_buffer[closest_rgb_index], temp_image, cv::Size(image_buffer[closest_rgb_index].cols/4, image_buffer[closest_rgb_index].rows/4));
+
+    // uncomment to plot Depth IMAGE
+    cv::resize(depth_buffer[closest_depth_index], temp_image, cv::Size(depth_buffer[closest_depth_index].cols/4, depth_buffer[closest_depth_index].rows/4));
+    
+    if(show_image){
+      // uncommet to show image
+      cv::imshow("view", temp_image);
+      cv::waitKey(1);
+    }
     
   }
 }
@@ -161,7 +190,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr rgb_feedback)
 {
  
-  //std::cout<<":: RGB LEFT MESSAGE :: "  << std::endl;
+  // std::cout<<":: RGB LEFT MESSAGE :: "  << std::endl;
 
   // Get timestamp in DOUBLE format
   std::string time_stamp_temp = std::to_string(rgb_feedback->header.stamp.toNSec());
@@ -174,7 +203,7 @@ void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr 
   // register the image to the last (int time) position of the buffer
   image_buffer[cyclic_index_rgb] = cv_bridge::toCvShare(rgb_feedback, "bgr8")->image ;
   image_stamps[cyclic_index_rgb] = std::stod(time_stamp_temp);
-  //std::cout<<"Stamp: " <<  image_stamps[cyclic_index_rgb]<< std::endl;
+  // std::cout<<"RGB Stamp: " <<  image_stamps[cyclic_index_rgb]<< std::endl;
 
 }
 
@@ -182,20 +211,30 @@ void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr 
 void ActivePerceptionController::depthCallback(const sensor_msgs::Image::ConstPtr depth_feedback)
 {
   
-  std::cout<<":: DEPTH MESSAGE :: "  << std::endl;
+  // std::cout<<":: DEPTH MESSAGE :: "  << std::endl;
   // Get timestamp in DOUBLE format
   std::string time_stamp_temp = std::to_string(depth_feedback->header.stamp.toNSec());
   time_stamp_temp = time_stamp_temp.substr(7, 3) + "." + time_stamp_temp.substr(10, 3) ;
  
+  // std::cout<<":: DEPTH MESSAGE :: Testpoint 1"  << std::endl;
+
   // increase the ring buffer's index
   cyclic_index_depth = cyclic_index_depth + 1;
   cyclic_index_depth = cyclic_index_depth % buffer_size;
 
+  // std::cout<<":: DEPTH MESSAGE :: Testpoint 2"  << std::endl;
+
   // register the image to the last (int time) position of the buffer
   // TODO: Search for the 32FC1 type. Is it correct?
   depth_buffer[cyclic_index_depth] = cv_bridge::toCvShare(depth_feedback, "32FC1")->image ;
+  //depth_buffer[cyclic_index_depth] = cv_bridge::toCvShare(depth_feedback, "mono8")->image ;
+  
+  //  std::cout<<":: DEPTH MESSAGE :: Testpoint 2.2"  << std::endl;
   depth_stamps[cyclic_index_depth] = std::stod(time_stamp_temp);
-  std::cout<<"Stamp: " <<  depth_stamps[cyclic_index_depth]<< std::endl;
+  // std::cout<<"Depth Stamp: " <<  depth_stamps[cyclic_index_depth]<< std::endl;
+
+  // std::cout<<"------------------------------------- DEPTH ::::::: "<<std::endl;
+  // std::cout<< depth_buffer[cyclic_index_depth]<<std::endl;
 
 }
 
@@ -213,6 +252,12 @@ ActivePerceptionController::ActivePerceptionController(const std::shared_ptr<arl
   nh.getParam("k_filter", k_filter);
   nh.getParam("m_filter", m_filter);
   nh.getParam("d_filter", d_filter);
+
+  nh.getParam("kinematic_chain", kinematic_chain);
+
+  nh.getParam("show_image", show_image);
+  
+  
 
   // printout
   std::cout<<"Ending constructor. "  << std::endl;
@@ -235,27 +280,29 @@ void ActivePerceptionController::init()
 
   // resize the ring buffers that hold the latest RGB and Depth images
   image_buffer.resize(buffer_size);
+  depth_buffer.resize(buffer_size);
   image_stamps.resize(buffer_size);
+  depth_stamps.resize(buffer_size);
 
   // get camera pose
-  Eigen::Affine3d tool_pose= robot->getTaskPose();
+  Eigen::Affine3d tool_pose= robot->getTaskPose(kinematic_chain);
 
   // initialization of the center of ROI
   p_camera = tool_pose.translation();
   R_camera = tool_pose.rotation();
-  p_Target_world = p_camera + 0.4 * R_camera.column(2);
+  p_Target_world = p_camera + 0.4 * R_camera.col(2);
   p_Target_vision = Eigen::Vector3d::Zero(3);
 
   // set the radius of ROI
   r_region = 0.3;
 
   // get the end-effector Jacobian
-  J_ee = robot->getJacobian();
-  J_ee.rows(0,2) = R_camera.transpose() * J_ee.rows(0,2);
-  J_ee.rows(3,5) = R_camera.transpose() * J_ee.rows(3,5);
+  J_ee = robot->getJacobian(kinematic_chain);
+  J_ee.topRows(3) = R_camera.transpose() * J_ee.topRows(3);
+  J_ee.bottomRows(3) = R_camera.transpose() * J_ee.bottomRows(3);
 
   // initialize filter velocity
-  v_filter = Eigen::Vector3d::Zero(3);
+  v_filter = Eigen::VectorXd::Zero(6);
 
   // get cycle time
   Tc = robot->cycle;
@@ -273,7 +320,7 @@ void ActivePerceptionController::init()
   obs_num_points = 0;
 
   // initially the target is absolute
-  relative_target = false;
+  vision_target = false;
 
   // start the subscription 
   stem_subscriber = nh.subscribe("/stem_coords", 1, &ActivePerceptionController::stemIdentCallback, this, ros::TransportHints().tcpNoDelay(true)); 
@@ -287,6 +334,10 @@ void ActivePerceptionController::init()
 // this is the measure function
 void ActivePerceptionController::measure()
 {
+
+  // printout
+  // std::cout<<"Staring measure. "  << std::endl;
+
   //if the identification found a stem
   if(valid_ident){
     // then we switch to relative target
@@ -296,19 +347,21 @@ void ActivePerceptionController::measure()
   }
 
   // get camera pose
-  Eigen::Affine3d tool_pose= robot->getTaskPose();
+  Eigen::Affine3d tool_pose= robot->getTaskPose(kinematic_chain);
   p_camera = tool_pose.translation();
   R_camera = tool_pose.rotation();
 
-  // get Jacobian
-  J_ee = robot->getTaskPose();
-  p_camera = tool_pose.translation();
-  R_camera = tool_pose.rotation();
+  // std::cout << "p_camera: " << p_camera <<std::endl;
+  // std::cout << "R_camera: " << arl::math::rotToQuat(R_camera.toArma()) <<std::endl;
+
+  //Eigen::VectorXd q_current = robot->getJointPosition(kinematic_chain);
+  //std::cout << "q_current: " << q_current <<std::endl;
+
 
   // get the end-effector Jacobian
-  J_ee = robot->getJacobian();
-  J_ee.rows(0,2) = R_camera.transpose() * J_ee.rows(0,2);
-  J_ee.rows(3,5) = R_camera.transpose() * J_ee.rows(3,5);
+  J_ee = robot->getJacobian(kinematic_chain);
+  J_ee.topRows(3) = R_camera.transpose() * J_ee.topRows(3);
+  J_ee.bottomRows(3) = R_camera.transpose() * J_ee.bottomRows(3);
 
   // std::cout<<"Ending measure. "  << std::endl;
 }
@@ -317,11 +370,14 @@ void ActivePerceptionController::measure()
 void ActivePerceptionController::update()
 {
 
+
+// printout
+  // std::cout<<"Staring update. "  << std::endl;
+
   // general purpose z vector
   Eigen::Vector3d z = Eigen::Vector3d::Zero(3);
   z(2) = 1;
 
-  Eigen::Vector3d e_p;
 
   // region reaching signal
   Eigen::Vector3d e_p;
@@ -330,6 +386,9 @@ void ActivePerceptionController::update()
   }else{
     e_p = R_camera.transpose() * (p_Target_world - p_camera);
   }
+
+  // std::cout<<"e_p " << e_p.transpose() <<std::endl;
+  // std::cout<<"p_Target_vision: " << p_Target_vision.transpose() <<std::endl;
 
   Eigen::VectorXd u = Eigen::VectorXd::Zero(6);
   // compute distance
@@ -364,7 +423,9 @@ void ActivePerceptionController::update()
   
   
   // compute the next acceleration
-  Eigen::VectorXd vddot = ( k_filter * u - d_filter * v_filter ) / m_filter;
+  Eigen::VectorXd vddot = Eigen::VectorXd::Zero(6);
+  
+  vddot = ( k_filter * u - d_filter * v_filter ) / m_filter;
   // integrate dynamical system -----
   v_filter = v_filter + vddot * Tc;
 
@@ -376,11 +437,17 @@ void ActivePerceptionController::update()
 void ActivePerceptionController::command()
 {
 
+  // printout
+  // std::cout<<"Staring command. "  << std::endl;
+
   // Map velocity to the joint space
-  Eigen::VectorXd qr = J_ee.inverse() * v_filter;
+  Eigen::VectorXd qr =  J_ee.inverse() * v_filter;
+
+  // std::cout<<"qr= "  << qr.transpose() << std::endl;
+  // std::cout<<"v_filter= "  << v_filter.transpose() << std::endl;
 
   // set joint velocity reference
-  robot->setJointVelocity(qr);
+  robot->setJointVelocity(qr, kinematic_chain);
 
   // spin the ROS callbacks
   ros::spinOnce();

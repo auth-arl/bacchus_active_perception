@@ -12,6 +12,9 @@
 #include <cv_bridge/cv_bridge.h>
 #include <active_perception/detector.h>
 
+#include <autharl_core/eigen_plugins.h>
+
+
 
 
 namespace arl
@@ -30,11 +33,12 @@ private:
   void stemIdentCallback(const std_msgs::Int32MultiArray::ConstPtr feedback);
   void rgbCallback(const sensor_msgs::Image::ConstPtr rgb_feedback);
   void depthCallback(const sensor_msgs::Image::ConstPtr depth_feedback);
-  int findClosestStamp(double current_stamp, std::vector<double> stamp_list);
+  int findClosestStamp(double current_stamp, std::vector<double> stamp_list, bool search_past);
   ros::NodeHandle nh;
   double k;
   ros::Subscriber stem_subscriber;
   ros::Subscriber rgb_subscriber;
+  ros::Subscriber depth_subscriber;
 
   Eigen::MatrixXi stem_mask;
   int stem_mask_npoints;
@@ -58,17 +62,20 @@ private:
   Eigen::Vector3d p_camera;
   Eigen::Matrix3d R_camera;
 
-  Eigen::MatrixXf stem_pointCloud;
+  Eigen::MatrixXd stem_pointCloud;
   int stem_num_points;
-  Eigen::MatrixXf obs_pointCloud;
+  Eigen::MatrixXd obs_pointCloud;
   int obs_num_points;
 
   Eigen::MatrixXd J_ee;
 
   bool vision_target;
+  bool show_image;
 
-  Eigen::Vector3d v_filter;
+  Eigen::VectorXd v_filter;
   double k_filter, m_filter, d_filter, Tc;
+
+  int kinematic_chain;
 
 };
 }  // namespace controller
