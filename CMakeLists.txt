@@ -11,12 +11,14 @@ find_package(catkin REQUIRED
   bacchus_robot
   std_msgs
   cv_bridge
+  ur_robot_driver
 )
 
 find_package(OpenCV REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include ${catkin_INCLUDE_DIRS}
+  DEPENDS bacchus_robot
 )
 
 include_directories(INCLUDE_DIRS

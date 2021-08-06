@@ -290,8 +290,12 @@ void ActivePerceptionController::init()
   // initialization of the center of ROI
   p_camera = tool_pose.translation();
   R_camera = tool_pose.rotation();
-  p_Target_world = p_camera + 0.4 * R_camera.col(2);
+  p_Target_world = p_camera + 0.5 * R_camera.col(2);
+  // p_Target_world(0) = p_Target_world(0) + 0.15;
+  // p_Target_world(1) = p_Target_world(1) + 0.25;
   p_Target_vision = Eigen::Vector3d::Zero(3);
+
+   std::cout << "p_camera: " << p_camera <<std::endl;
 
   // set the radius of ROI
   r_region = 0.3;
@@ -300,6 +304,9 @@ void ActivePerceptionController::init()
   J_ee = robot->getJacobian(kinematic_chain);
   J_ee.topRows(3) = R_camera.transpose() * J_ee.topRows(3);
   J_ee.bottomRows(3) = R_camera.transpose() * J_ee.bottomRows(3);
+
+
+  
 
   // initialize filter velocity
   v_filter = Eigen::VectorXd::Zero(6);
@@ -351,6 +358,9 @@ void ActivePerceptionController::measure()
   p_camera = tool_pose.translation();
   R_camera = tool_pose.rotation();
 
+  Eigen::VectorXd q= robot->getJointPosition(kinematic_chain);
+  // std::cout<<"q " << q.transpose() <<std::endl;
+
   // std::cout << "p_camera: " << p_camera <<std::endl;
   // std::cout << "R_camera: " << arl::math::rotToQuat(R_camera.toArma()) <<std::endl;
 
@@ -362,6 +372,9 @@ void ActivePerceptionController::measure()
   J_ee = robot->getJacobian(kinematic_chain);
   J_ee.topRows(3) = R_camera.transpose() * J_ee.topRows(3);
   J_ee.bottomRows(3) = R_camera.transpose() * J_ee.bottomRows(3);
+
+  // std::cout<<"J_ee: " << J_ee <<std::endl;
+  // std::cout<<"q: " <<  robot->getJointPosition(kinematic_chain).transpose() <<std::endl;
 
   // std::cout<<"Ending measure. "  << std::endl;
 }
@@ -377,6 +390,10 @@ void ActivePerceptionController::update()
   // general purpose z vector
   Eigen::Vector3d z = Eigen::Vector3d::Zero(3);
   z(2) = 1;
+  
+
+  // Uncomment this to use vision
+  vision_target = false;
 
 
   // region reaching signal
@@ -387,12 +404,16 @@ void ActivePerceptionController::update()
     e_p = R_camera.transpose() * (p_Target_world - p_camera);
   }
 
+  // std::cout<<"p_Target_world " << p_Target_world.transpose() <<std::endl;
+  // std::cout<<"p_camera " << p_camera.transpose() <<std::endl;
   // std::cout<<"e_p " << e_p.transpose() <<std::endl;
   // std::cout<<"p_Target_vision: " << p_Target_vision.transpose() <<std::endl;
 
   Eigen::VectorXd u = Eigen::VectorXd::Zero(6);
   // compute distance
   double dista = e_p.norm();
+
+ 
 
   // if not within the region
   if(dista>r_region){
@@ -441,10 +462,10 @@ void ActivePerceptionController::command()
   // std::cout<<"Staring command. "  << std::endl;
 
   // Map velocity to the joint space
-  Eigen::VectorXd qr =  J_ee.inverse() * v_filter;
+  Eigen::VectorXd qr =  J_ee.pinv() * v_filter;
 
-  // std::cout<<"qr= "  << qr.transpose() << std::endl;
-  // std::cout<<"v_filter= "  << v_filter.transpose() << std::endl;
+   std::cout<<"qr= "  << qr.transpose() << std::endl;
+  //  std::cout<<"v_filter= "  << v_filter.transpose() << std::endl;
 
   // set joint velocity reference
   robot->setJointVelocity(qr, kinematic_chain);

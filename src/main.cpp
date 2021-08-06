@@ -19,7 +19,8 @@ int main ( int argc, char** argv )
   std::shared_ptr<arl::robot::Model> model = std::make_shared<arl::robot::ROSModel>("/robot/robot_description");
 
   // Create a simulated robot, use can use a real robot also
-  std::shared_ptr<arl::robot::Robot> robot = std::make_shared<arl::robot::RobotSim>(model, 1e-3);
+  // std::shared_ptr<arl::robot::Robot> robot = std::make_shared<arl::robot::RobotSim>(model, 1e-3);
+  auto robot = std::make_shared<arl::bac::Robot>(model);
   // auto robot = std::make_shared<arl::ur5e::Robot>(model);
   //auto robot = std::make_shared<arl::bac::Robot>(model, false, "bacchus_test");
   // Create a visualizater for see the result in rviz
