@@ -77,6 +77,9 @@ private:
 
   int kinematic_chain;
 
+  int count_images;
+  
+
 };
 }  // namespace controller
 }  // namespace arl

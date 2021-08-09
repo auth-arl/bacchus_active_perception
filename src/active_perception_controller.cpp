@@ -56,7 +56,11 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 
   // initializing the pinhole camera
   // THIS REQUIRES THE INTRINSIC CALIBRATION PARAMETERS
-  PinholeCamera phC(894.187, 894.187, 642.957, 361.011, 1280, 720);
+  // PinholeCamera phC(894.187, 894.187, 642.957, 361.011, 1280, 720);
+  PinholeCamera phC(1056.782470703125, 1056.782470703125, 1102.609130859375, 618.5433959960938, 2208, 1242);
+  // K: [1056.782470703125, 0.0, 1102.609130859375, 0.0, 1056.782470703125, 618.5433959960938, 0.0, 0.0, 1.0]
+
+
  
    
    std::cout<<"-----------------===== STEM MESSAGE ======---------------------- "  << std::endl;
@@ -67,14 +71,16 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
   label = label.substr(13, 3) + "." + label.substr(16, 3) ;
   // convert it to DOUBLE
   double current_stamp = std::stod(label);
-  // std::cout<<"Label: " << current_stamp << std::endl;
-  // std::cout<<"Stems identified: " << num_stems << std::endl;
+   std::cout<<"Label: " << current_stamp << std::endl;
+   std::cout<<"Stems identified: " << num_stems << std::endl;
 
   // this is the color for painting the ste in the RGB result
   cv::Vec3b stem_paint_color;
   stem_paint_color[0] = 0;   // B
   stem_paint_color[1] = 0;   // G
   stem_paint_color[2] = 255; // R
+
+  int pp_index = 0;
 
   
   // finds the closest timestamo from the current one, both in RGB and Depth
@@ -86,7 +92,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
   // std::cout << "closest_depth_index:  " << closest_depth_index << std::endl;
    
   // if there are stems identified and the closest DEPTH index is not -1
-  if(num_stems>=1 && closest_depth_index>=0){
+  if(num_stems>=1 && closest_depth_index>=0 && count_images>buffer_size){
 
     // initialize stem points  
     stem_mask_npoints = 0;
@@ -95,6 +101,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
     int downsampling = 80; 
 
     // the default size of the array by CERTH is 25000 points
+    pp_index = 0;
     for (int i = 0; i<25000/downsampling; i++){
 
         // the downsampling index
@@ -116,14 +123,24 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 
           // find the point's position with respect to the camera
           Eigen::Vector2d p2d;
-          int elem1 = 592 + stem_mask(i,1); // we add the offset of CERTH
-          int elem2 =  109 +  stem_mask(i,0); // we add the offset of CERTH
+          // int offset_width = 296;
+          // int offset_height = 55;
+          int offset_width = 592;
+          int offset_height = 109;
+          int elem1 = offset_width + stem_mask(i,1); // we add the offset of CERTH
+          int elem2 =  offset_height +  stem_mask(i,0); // we add the offset of CERTH
           p2d << elem1, elem2;
           // back project
-          Eigen::Vector3d point_temp = phC.backProject( p2d , depth_buffer[closest_depth_index].at<double>(cv::Point(elem1, elem2)));
-          // std::cout<< depth_buffer[closest_depth_index].at<double>( elem1, elem2 ) <<std::endl;
+          Eigen::Vector3d point_temp = phC.backProject( p2d , depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2)));
+
+          double d_temp = depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2));
+           
           // register the point in the stem point cloud
-          stem_pointCloud.col(i) = point_temp;
+          if(d_temp > -1e4 && d_temp< 1e4 && d_temp == d_temp ){
+            stem_pointCloud.col(pp_index) = point_temp;
+            pp_index = pp_index + 1;
+            std::cout<< d_temp  <<std::endl;
+          }
 
           //change the color of the point in the RGB image
           image_buffer[closest_rgb_index].at<cv::Vec3b>(cv::Point(elem1, elem2)) = stem_paint_color;
@@ -135,7 +152,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
  
 
     // In this point, we identify if we have a square of 100x100, which is considered to be an error
-    if(stem_mask(9999,0) - stem_mask(0,0) == 99 &&  stem_mask(9999,1) - stem_mask(0,1) == 99){
+    if(stem_mask(9999,0) - stem_mask(0,0) == 99 &&  stem_mask(9999,1) - stem_mask(0,1) == 99 || pp_index==0){
       
       std::cout<<"-------------------------------------------[!WARNING!] Identification is rejected ... Reason: 100x100 square!!!" <<std::endl; 
       // this is not a valid stem identification
@@ -145,37 +162,38 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
       valid_ident = true;
       
       // so the stem number of points is set to the counted points
-      stem_num_points = stem_mask_npoints;
+      stem_num_points = pp_index;
 
       // compute the mean of all the stem points
       // Eigen::MatrixXd temp_mat = stem_pointCloud.leftCols(stem_num_points);
       p_Target_vision = stem_pointCloud.leftCols(stem_num_points).rowwise().mean();
+      std::cout << "the new target is at:" << p_Target_vision.transpose() <<std::endl;
     }
 
     // printouts
-    // std::cout << "stem_mask_npoints: " << stem_mask_npoints << std::endl;
-    // std::cout << "identification  timestamp:  " << current_stamp << std::endl;
+     std::cout << "stem_mask_npoints: " << stem_mask_npoints << std::endl;
+     std::cout << "identification  timestamp:  " << current_stamp << std::endl;
     
-    // std::cout << "rgb timestamps:  ";
-    // for(int ll = 0; ll<buffer_size; ll++)  std::cout << image_stamps[ll] << " ";
-    // std::cout << std::endl;
-    //  std::cout << "closest rgb timestamp:  " << image_stamps[closest_rgb_index] << std::endl;
+    std::cout << "rgb timestamps:  ";
+    for(int ll = 0; ll<buffer_size; ll++)  std::cout << image_stamps[ll] << " ";
+    std::cout << std::endl;
+     std::cout << "closest rgb timestamp:  " << image_stamps[closest_rgb_index] << std::endl;
      
-    //   std::cout << "depth timestamps:  ";
-    // for(int ll = 0; ll<buffer_size; ll++) std::cout  << depth_stamps[ll] << " ";
-    // std::cout << std::endl;
-    //  std::cout << "closest depth timestamp:  " << depth_stamps[closest_depth_index] << std::endl;
-    // std::cout << "stem_num_points: " << stem_num_points<< std::endl;
-    // std::cout << "stem_pointCloud: " << stem_pointCloud.leftCols(stem_num_points) << std::endl;
+      std::cout << "depth timestamps:  ";
+    for(int ll = 0; ll<buffer_size; ll++) std::cout  << depth_stamps[ll] << " ";
+    std::cout << std::endl;
+     std::cout << "closest depth timestamp:  " << depth_stamps[closest_depth_index] << std::endl;
+    std::cout << "stem_num_points: " << stem_num_points<< std::endl;
+    std::cout << "stem_pointCloud: " << stem_pointCloud.leftCols(stem_num_points) << std::endl;
 
     // CV image display
     cv::Mat temp_image;
 
     // uncomment to plot RGB IMAGE
-    // cv::resize(image_buffer[closest_rgb_index], temp_image, cv::Size(image_buffer[closest_rgb_index].cols/4, image_buffer[closest_rgb_index].rows/4));
+    cv::resize(image_buffer[closest_rgb_index], temp_image, cv::Size(image_buffer[closest_rgb_index].cols/2, image_buffer[closest_rgb_index].rows/2));
 
     // uncomment to plot Depth IMAGE
-    cv::resize(depth_buffer[closest_depth_index], temp_image, cv::Size(depth_buffer[closest_depth_index].cols/4, depth_buffer[closest_depth_index].rows/4));
+    // cv::resize(depth_buffer[closest_depth_index], temp_image, cv::Size(depth_buffer[closest_depth_index].cols/2, depth_buffer[closest_depth_index].rows/2));
     
     if(show_image){
       // uncommet to show image
@@ -190,7 +208,9 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr rgb_feedback)
 {
  
-  // std::cout<<":: RGB LEFT MESSAGE :: "  << std::endl;
+  //  std::cout<<":: RGB LEFT MESSAGE :: "  << std::endl;
+
+   count_images = count_images + 1;
 
   // Get timestamp in DOUBLE format
   std::string time_stamp_temp = std::to_string(rgb_feedback->header.stamp.toNSec());
@@ -203,7 +223,8 @@ void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr 
   // register the image to the last (int time) position of the buffer
   image_buffer[cyclic_index_rgb] = cv_bridge::toCvShare(rgb_feedback, "bgr8")->image ;
   image_stamps[cyclic_index_rgb] = std::stod(time_stamp_temp);
-  // std::cout<<"RGB Stamp: " <<  image_stamps[cyclic_index_rgb]<< std::endl;
+  //  std::cout<<"RGB Stamp: " <<  image_stamps[cyclic_index_rgb] << std::endl;
+  // std::cout<<"Image size: " <<  image_buffer[cyclic_index_rgb].size() << std::endl;
 
 }
 
@@ -231,10 +252,27 @@ void ActivePerceptionController::depthCallback(const sensor_msgs::Image::ConstPt
   
   //  std::cout<<":: DEPTH MESSAGE :: Testpoint 2.2"  << std::endl;
   depth_stamps[cyclic_index_depth] = std::stod(time_stamp_temp);
-  // std::cout<<"Depth Stamp: " <<  depth_stamps[cyclic_index_depth]<< std::endl;
+  //std::cout<<"Depth Stamp: " <<  depth_stamps[cyclic_index_depth]<< std::endl;
 
   // std::cout<<"------------------------------------- DEPTH ::::::: "<<std::endl;
-  // std::cout<< depth_buffer[cyclic_index_depth]<<std::endl;
+  std::cout << "Depth------> " <<depth_buffer[cyclic_index_depth].at<float>(cv::Point(2208/2, 1242/2))<<std::endl;
+  std::cout << "Size depth -> " <<depth_buffer[cyclic_index_depth].size()<<std::endl;
+
+
+  // cv::Mat temp_image;
+
+  //   // uncomment to plot Depth IMAGE
+
+  //   //cv::circle(temp_image,cv::Point(2208/2, 1242/2),400/32,cv::Scalar(0,0,255),cv::FILLED,cv::LINE_8); 
+
+  //   cv::resize(depth_buffer[cyclic_index_depth], temp_image, cv::Size(depth_buffer[cyclic_index_depth].cols/2,depth_buffer[cyclic_index_depth].rows/2));
+    
+   
+  //   // uncommet to show image
+  //   cv::imshow("view", temp_image);
+  //   cv::waitKey(1);
+   
+    
 
 }
 
@@ -284,6 +322,8 @@ void ActivePerceptionController::init()
   image_stamps.resize(buffer_size);
   depth_stamps.resize(buffer_size);
 
+  count_images = 0;
+
   // get camera pose
   Eigen::Affine3d tool_pose= robot->getTaskPose(kinematic_chain);
 
@@ -329,10 +369,12 @@ void ActivePerceptionController::init()
   // initially the target is absolute
   vision_target = false;
 
+
   // start the subscription 
   stem_subscriber = nh.subscribe("/stem_coords", 1, &ActivePerceptionController::stemIdentCallback, this, ros::TransportHints().tcpNoDelay(true)); 
-  rgb_subscriber = nh.subscribe("/zed_node_D/left/image_rect_color", 1, &ActivePerceptionController::rgbCallback, this, ros::TransportHints().tcpNoDelay(true)); 
-  depth_subscriber = nh.subscribe("/zed_node_D/depth/depth_registered", 1, &ActivePerceptionController::depthCallback, this, ros::TransportHints().tcpNoDelay(true)); 
+  rgb_subscriber = nh.subscribe("/zed_node_B/left/image_rect_color", 1, &ActivePerceptionController::rgbCallback, this, ros::TransportHints().tcpNoDelay(true)); 
+  depth_subscriber = nh.subscribe("/zed_node_B/depth/depth_registered", 1, &ActivePerceptionController::depthCallback, this, ros::TransportHints().tcpNoDelay(true)); 
+
 
   // printouts
   std::cout<<"Ending init. "  << std::endl;
@@ -343,7 +385,7 @@ void ActivePerceptionController::measure()
 {
 
   // printout
-  // std::cout<<"Staring measure. "  << std::endl;
+  //  std::cout<<"Staring measure. "  << std::endl;
 
   //if the identification found a stem
   if(valid_ident){
@@ -385,7 +427,7 @@ void ActivePerceptionController::update()
 
 
 // printout
-  // std::cout<<"Staring update. "  << std::endl;
+//  std::cout<<"Staring update. "  << std::endl;
 
   // general purpose z vector
   Eigen::Vector3d z = Eigen::Vector3d::Zero(3);
@@ -393,7 +435,7 @@ void ActivePerceptionController::update()
   
 
   // Uncomment this to use vision
-  vision_target = false;
+  // vision_target = false;
 
 
   // region reaching signal
@@ -459,16 +501,16 @@ void ActivePerceptionController::command()
 {
 
   // printout
-  // std::cout<<"Staring command. "  << std::endl;
+  //  std::cout<<"Staring command. "  << std::endl;
 
   // Map velocity to the joint space
   Eigen::VectorXd qr =  J_ee.pinv() * v_filter;
 
-   std::cout<<"qr= "  << qr.transpose() << std::endl;
+  // std::cout<<"qr= "  << qr.transpose() << std::endl;
   //  std::cout<<"v_filter= "  << v_filter.transpose() << std::endl;
 
   // set joint velocity reference
-  robot->setJointVelocity(qr, kinematic_chain);
+  robot->setJointVelocity(qr.setZero(), kinematic_chain);
 
   // spin the ROS callbacks
   ros::spinOnce();

@@ -22,9 +22,9 @@ int main ( int argc, char** argv )
   // std::shared_ptr<arl::robot::Robot> robot = std::make_shared<arl::robot::RobotSim>(model, 1e-3);
   auto robot = std::make_shared<arl::bac::Robot>(model);
   // auto robot = std::make_shared<arl::ur5e::Robot>(model);
-  //auto robot = std::make_shared<arl::bac::Robot>(model, false, "bacchus_test");
+  // auto robot = std::make_shared<arl::bac::Robot>(model, false, "bacchus_test");
   // Create a visualizater for see the result in rviz
-  // auto rviz = std::make_shared<arl::viz::RosStatePublisher>(robot);
+  auto rviz = std::make_shared<arl::viz::RosStatePublisher>(robot, "/robot/arm/robot/arm/joint_states");
 
   // Create the joint trajectory controller
   // auto joint_trajectory = std::make_shared<arl::controller::JointTrajectory>(robot);
@@ -34,7 +34,7 @@ int main ( int argc, char** argv )
 
   robot->setMode(arl::robot::Mode::VELOCITY_CONTROL);
   // joint_trajectory->reference({0.0, -1.71832, -1.62427, -1.08471,  1.82317,  1.00598, 0.0, -1.71832, -1.62427, -1.08471,  1.82317,  1.00598}, 20);
-  // std::thread rviz_thread(&arl::viz::RosStatePublisher::run, rviz);
+  std::thread rviz_thread(&arl::viz::RosStatePublisher::run, rviz);
 
   // Run the trajectory controller
   // joint_trajectory->run();
@@ -42,6 +42,8 @@ int main ( int argc, char** argv )
   // Run the active perception controller
   
   ap_controller->run();
+  //ap_controller->init();
+  //ros::spin();
 
   std::cout<<"Ended controller."  << std::endl;
 
