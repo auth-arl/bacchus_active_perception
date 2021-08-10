@@ -14,6 +14,22 @@
 
 #include <autharl_core/eigen_plugins.h>
 
+// PCL specific includes
+#include <pcl/ros/conversions.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+
+#include <pcl_ros/point_cloud.h>
+
+#include <sensor_msgs/PointCloud2.h>
+// #include <pcl/filters/voxel_grid.h>
+
+// #include <pcl/features/narf.h>
+// #include <pcl/keypoints/narf_keypoint.h>
+// #include <pcl/range_image/range_image.h>
+// #include <pcl/features/range_image_border_extractor.h>
+// #include <pcl/range_image/range_image_planar.h>
+
 
 
 
@@ -78,6 +94,11 @@ private:
   int kinematic_chain;
 
   int count_images;
+
+  
+  ros::Publisher stem_pc_pub;
+  ros::Publisher whole_pc_pub;
+  
   
 
 };

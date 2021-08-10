@@ -82,10 +82,17 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 
   int pp_index = 0;
 
+
+  
+
   
   // finds the closest timestamo from the current one, both in RGB and Depth
   int closest_rgb_index = findClosestStamp(current_stamp, image_stamps, true);
   int closest_depth_index = findClosestStamp(current_stamp, depth_stamps, false);
+
+
+  pcl::PointCloud<pcl::PointXYZ> stem_pcl;
+
   
   // printouts
   // std::cout << "closest_rgb_index:  " << closest_rgb_index << std::endl;
@@ -98,7 +105,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
     stem_mask_npoints = 0;
 
     // set downsampling coefficient, e.g. downsample by 80 times
-    int downsampling = 80; 
+    int downsampling = 1; 
 
     // the default size of the array by CERTH is 25000 points
     pp_index = 0;
@@ -107,7 +114,7 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
         // the downsampling index
         int ds_index = (i*downsampling);
 
-        // if the index is not -1
+        // if the index is not -1stem_pc_pub
         if(feedback->data[ds_index]!=-1){
 
           // then we have a stem point
@@ -134,6 +141,10 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
           Eigen::Vector3d point_temp = phC.backProject( p2d , depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2)));
 
           double d_temp = depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2));
+
+
+
+          // std::cout << "d_temp:" << d_temp <<std::endl;
            
           // register the point in the stem point cloud
           if(d_temp > -1e4 && d_temp< 1e4 && d_temp == d_temp ){
@@ -146,15 +157,19 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
           image_buffer[closest_rgb_index].at<cv::Vec3b>(cv::Point(elem1, elem2)) = stem_paint_color;
 
         }
+
     }
 
+
+    
 
  
 
     // In this point, we identify if we have a square of 100x100, which is considered to be an error
-    if(stem_mask(9999,0) - stem_mask(0,0) == 99 &&  stem_mask(9999,1) - stem_mask(0,1) == 99 || pp_index==0){
+    //if(stem_mask(9999,0) - stem_mask(0,0) == 99 &&  stem_mask(9999,1) - stem_mask(0,1) == 99 || pp_index==0){
+    if(pp_index==0){
       
-      std::cout<<"-------------------------------------------[!WARNING!] Identification is rejected ... Reason: 100x100 square!!!" <<std::endl; 
+      std::cout<<"-------------------------------------------[!WARNING!] Identification is rejected ..." <<std::endl; 
       // this is not a valid stem identification
       valid_ident = false;
     }else{
@@ -168,6 +183,24 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
       // Eigen::MatrixXd temp_mat = stem_pointCloud.leftCols(stem_num_points);
       p_Target_vision = stem_pointCloud.leftCols(stem_num_points).rowwise().mean();
       std::cout << "the new target is at:" << p_Target_vision.transpose() <<std::endl;
+
+
+      /////////////////////////// UNCOMMENT TO PUBLISH STEM POINT CLOUD //////////////////
+      // stem_pcl.points.resize (stem_num_points);
+      // for (int i = 0; i<stem_num_points; i++){
+      //   Eigen::Vector3f temp_point;
+      //   for (int j = 0; j<3; j++){
+      //     temp_point(j) = (float)stem_pointCloud(j,i);
+      //   }
+      //   stem_pcl.points[i].getVector3fMap () = temp_point;
+      // }
+
+      // stem_pc_pub.publish(stem_pcl.makeShared());
+      // std::cout << "Stem point cloud published. " << std::endl;
+      // //ros::spinOnce();
+      //////////////////////////////////////////////////////////////////////////////////
+
+
     }
 
     // printouts
@@ -232,6 +265,9 @@ void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr 
 void ActivePerceptionController::depthCallback(const sensor_msgs::Image::ConstPtr depth_feedback)
 {
   
+
+  PinholeCamera phC(1056.782470703125, 1056.782470703125, 1102.609130859375, 618.5433959960938, 2208, 1242);
+
   // std::cout<<":: DEPTH MESSAGE :: "  << std::endl;
   // Get timestamp in DOUBLE format
   std::string time_stamp_temp = std::to_string(depth_feedback->header.stamp.toNSec());
@@ -257,6 +293,40 @@ void ActivePerceptionController::depthCallback(const sensor_msgs::Image::ConstPt
   // std::cout<<"------------------------------------- DEPTH ::::::: "<<std::endl;
   std::cout << "Depth------> " <<depth_buffer[cyclic_index_depth].at<float>(cv::Point(2208/2, 1242/2))<<std::endl;
   std::cout << "Size depth -> " <<depth_buffer[cyclic_index_depth].size()<<std::endl;
+
+  ///////////////////// UNCOMMEND TO PUBLISH POINT CLOUD ///////////////////////
+  // pcl::PointCloud<pcl::PointXYZ> whole_pc;
+  // whole_pc.points.resize (2208 * 1242);
+
+  // for(int i = 0; i<1242; i++){
+  //   for(int j = 0; j<2208; j++){
+
+  //     Eigen::Vector2d p2d;
+  //     p2d << j, i;
+
+  //     Eigen::Vector3d point_temp = phC.backProject( p2d , depth_buffer[cyclic_index_depth].at<float>(cv::Point(j, i)));
+  //     Eigen::Vector3f point_temp2;
+      
+  //     for(int ll= 0; ll<3; ll++){
+  //       point_temp2(ll) = (float)point_temp(ll);
+  //     }
+
+  //    whole_pc.points[i*2208+ j].getVector3fMap() = point_temp2;
+
+  //   }
+  // }
+
+  // sensor_msgs::PointCloud2 msg_out;
+  // pcl::toROSMsg(whole_pc, msg_out);
+  // msg_out.header.frame_id = "zedB_left_camera_optical_frame";
+
+  // whole_pc_pub.publish(msg_out);
+  // std::cout << "Whole point cloud published. " << std::endl;
+  /////////////////////////////////////////////////////////////////////////
+
+
+
+      //ros::spinOnce();
 
 
   // cv::Mat temp_image;
@@ -294,7 +364,12 @@ ActivePerceptionController::ActivePerceptionController(const std::shared_ptr<arl
   nh.getParam("kinematic_chain", kinematic_chain);
 
   nh.getParam("show_image", show_image);
-  
+
+
+
+
+  //stem_pc_pub = nh.advertise< pcl::PointCloud<pcl::PointXYZ> > ("stem_pointcloud", 1);
+  //whole_pc_pub = nh.advertise< pcl::PointCloud<pcl::PointXYZ> > ("whole_pointcloud", 1);
   
 
   // printout
