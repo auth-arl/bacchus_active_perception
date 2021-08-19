@@ -93,6 +93,11 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 
   pcl::PointCloud<pcl::PointXYZ> stem_pcl;
 
+  cv::Mat temp_image_2 ;
+  //temp_image_2 = cv::Mat::zeros(temp_image_2.rows,temp_image_2.cols,image_buffer[closest_rgb_index].type());
+
+  depth_buffer[closest_depth_index].convertTo(temp_image_2, image_buffer[closest_rgb_index].type(), 1);
+
   
   // printouts
   // std::cout << "closest_rgb_index:  " << closest_rgb_index << std::endl;
@@ -138,13 +143,13 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
           int elem2 =  offset_height +  stem_mask(i,0); // we add the offset of CERTH
           p2d << elem1, elem2;
           // back project
-          Eigen::Vector3d point_temp = phC.backProject( p2d , depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2)));
+          Eigen::Vector3d point_temp = phC.backProject( p2d , (double)depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2)));
 
-          double d_temp = depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2));
+          float d_temp = depth_buffer[closest_depth_index].at<float>(cv::Point(elem1, elem2));
 
 
 
-          // std::cout << "d_temp:" << d_temp <<std::endl;
+           std::cout  << d_temp <<" , ";
            
           // register the point in the stem point cloud
           if(d_temp > -1e4 && d_temp< 1e4 && d_temp == d_temp ){
@@ -155,10 +160,13 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 
           //change the color of the point in the RGB image
           image_buffer[closest_rgb_index].at<cv::Vec3b>(cv::Point(elem1, elem2)) = stem_paint_color;
+          temp_image_2.at<cv::Vec3b>(cv::Point(elem1, elem2)) = stem_paint_color;
 
         }
+         
 
     }
+    std::cout << std::endl;
 
 
     
@@ -186,51 +194,59 @@ void ActivePerceptionController::stemIdentCallback(const std_msgs::Int32MultiArr
 
 
       /////////////////////////// UNCOMMENT TO PUBLISH STEM POINT CLOUD //////////////////
-      // stem_pcl.points.resize (stem_num_points);
-      // for (int i = 0; i<stem_num_points; i++){
-      //   Eigen::Vector3f temp_point;
-      //   for (int j = 0; j<3; j++){
-      //     temp_point(j) = (float)stem_pointCloud(j,i);
-      //   }
-      //   stem_pcl.points[i].getVector3fMap () = temp_point;
-      // }
+      stem_pcl.points.resize (stem_num_points);
+      for (int i = 0; i<stem_num_points; i++){
+        Eigen::Vector3f temp_point;
+        for (int j = 0; j<3; j++){
+          temp_point(j) = (float)stem_pointCloud(j,i);
+        }
+        stem_pcl.points[i].getVector3fMap () = temp_point;
+      }
 
-      // stem_pc_pub.publish(stem_pcl.makeShared());
-      // std::cout << "Stem point cloud published. " << std::endl;
-      // //ros::spinOnce();
-      //////////////////////////////////////////////////////////////////////////////////
+    sensor_msgs::PointCloud2 msg_out;
+    pcl::toROSMsg(stem_pcl, msg_out);
+    msg_out.header.frame_id = "zedB_left_camera_optical_frame";
+
+    stem_pc_pub.publish(msg_out);
+    std::cout << "Stem point cloud published. " << std::endl;
+    //ros::spinOnce();
+    //////////////////////////////////////////////////////////////////////////////////
 
 
     }
 
+
+
+  //temp_image_2.at()
+
     // printouts
-     std::cout << "stem_mask_npoints: " << stem_mask_npoints << std::endl;
-     std::cout << "identification  timestamp:  " << current_stamp << std::endl;
+    //  std::cout << "stem_mask_npoints: " << stem_mask_npoints << std::endl;
+    //  std::cout << "identification  timestamp:  " << current_stamp << std::endl;
     
-    std::cout << "rgb timestamps:  ";
-    for(int ll = 0; ll<buffer_size; ll++)  std::cout << image_stamps[ll] << " ";
-    std::cout << std::endl;
-     std::cout << "closest rgb timestamp:  " << image_stamps[closest_rgb_index] << std::endl;
+    // std::cout << "rgb timestamps:  ";
+    // for(int ll = 0; ll<buffer_size; ll++)  std::cout << image_stamps[ll] << " ";
+    // std::cout << std::endl;
+    //  std::cout << "closest rgb timestamp:  " << image_stamps[closest_rgb_index] << std::endl;
      
-      std::cout << "depth timestamps:  ";
-    for(int ll = 0; ll<buffer_size; ll++) std::cout  << depth_stamps[ll] << " ";
-    std::cout << std::endl;
-     std::cout << "closest depth timestamp:  " << depth_stamps[closest_depth_index] << std::endl;
-    std::cout << "stem_num_points: " << stem_num_points<< std::endl;
-    std::cout << "stem_pointCloud: " << stem_pointCloud.leftCols(stem_num_points) << std::endl;
+    //   std::cout << "depth timestamps:  ";
+    // for(int ll = 0; ll<buffer_size; ll++) std::cout  << depth_stamps[ll] << " ";
+    // std::cout << std::endl;
+    //  std::cout << "closest depth timestamp:  " << depth_stamps[closest_depth_index] << std::endl;
+    // std::cout << "stem_num_points: " << stem_num_points<< std::endl;
+    // std::cout << "stem_pointCloud: " << stem_pointCloud.leftCols(stem_num_points) << std::endl;
 
     // CV image display
     cv::Mat temp_image;
 
     // uncomment to plot RGB IMAGE
-    cv::resize(image_buffer[closest_rgb_index], temp_image, cv::Size(image_buffer[closest_rgb_index].cols/2, image_buffer[closest_rgb_index].rows/2));
+    // cv::resize(image_buffer[closest_rgb_index], temp_image, cv::Size(image_buffer[closest_rgb_index].cols/2, image_buffer[closest_rgb_index].rows/2));
 
     // uncomment to plot Depth IMAGE
-    // cv::resize(depth_buffer[closest_depth_index], temp_image, cv::Size(depth_buffer[closest_depth_index].cols/2, depth_buffer[closest_depth_index].rows/2));
+    cv::resize(temp_image_2, temp_image, cv::Size(temp_image_2.cols/2, temp_image_2.rows/2));
     
     if(show_image){
       // uncommet to show image
-      cv::imshow("view", temp_image);
+      cv::imshow("view", temp_image_2);
       cv::waitKey(1);
     }
     
@@ -254,7 +270,7 @@ void ActivePerceptionController::rgbCallback(const sensor_msgs::Image::ConstPtr 
   cyclic_index_rgb = cyclic_index_rgb % buffer_size;
 
   // register the image to the last (int time) position of the buffer
-  image_buffer[cyclic_index_rgb] = cv_bridge::toCvShare(rgb_feedback, "bgr8")->image ;
+  image_buffer[cyclic_index_rgb] = (cv_bridge::toCvShare(rgb_feedback, "bgr8")->image).clone() ;
   image_stamps[cyclic_index_rgb] = std::stod(time_stamp_temp);
   //  std::cout<<"RGB Stamp: " <<  image_stamps[cyclic_index_rgb] << std::endl;
   // std::cout<<"Image size: " <<  image_buffer[cyclic_index_rgb].size() << std::endl;
@@ -283,7 +299,7 @@ void ActivePerceptionController::depthCallback(const sensor_msgs::Image::ConstPt
 
   // register the image to the last (int time) position of the buffer
   // TODO: Search for the 32FC1 type. Is it correct?
-  depth_buffer[cyclic_index_depth] = cv_bridge::toCvShare(depth_feedback, "32FC1")->image ;
+  depth_buffer[cyclic_index_depth] = (cv_bridge::toCvShare(depth_feedback, "32FC1")->image).clone() ;
   //depth_buffer[cyclic_index_depth] = cv_bridge::toCvShare(depth_feedback, "mono8")->image ;
   
   //  std::cout<<":: DEPTH MESSAGE :: Testpoint 2.2"  << std::endl;
@@ -368,7 +384,7 @@ ActivePerceptionController::ActivePerceptionController(const std::shared_ptr<arl
 
 
 
-  //stem_pc_pub = nh.advertise< pcl::PointCloud<pcl::PointXYZ> > ("stem_pointcloud", 1);
+  stem_pc_pub = nh.advertise< pcl::PointCloud<pcl::PointXYZ> > ("stem_pointcloud", 1);
   //whole_pc_pub = nh.advertise< pcl::PointCloud<pcl::PointXYZ> > ("whole_pointcloud", 1);
   
 

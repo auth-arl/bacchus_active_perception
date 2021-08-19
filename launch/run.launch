@@ -13,4 +13,7 @@
 
     </node>
      <rosparam command="load" param="autharl_robot_model" file="$(find autharl_description)/yaml/bacchus.yml" />
+
+    <include file="$(find bacchus_robot)/launch/robot_state_publisher.launch"/>
+
 </launch>
